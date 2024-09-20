@@ -3,7 +3,7 @@ from dataclasses import dataclass
 @dataclass
 class User(object):
     """Represents a User within the Psql database
-    
+
     Attributes
     ----------
     id (int)

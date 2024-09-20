@@ -3,7 +3,7 @@ import jwt
 import os
 import dotenv
 
-from models import User
+from models import *
 from errors import *
 
 from functools import wraps
@@ -82,7 +82,7 @@ def verify():
         user, _ = psql_helper.retrieve_user_by_id(decode_jwt(params['token'])['user_id'])
     except UserRetrievalException as e:
         return make_response("An error occured during user retrieval", 400)
-    
+
     if user.verified:
         return make_response("User already verified", 200)
     try:

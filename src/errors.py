@@ -9,3 +9,7 @@ class UserCreationException(Exception):
 class UserVerificationException(Exception):
     """Raised when an error occurs during user verification"""
     ...
+
+class UserPermissionAppendException(Exception):
+    """Raised when an error occurs during the appending of user permissions"""
+    ...
