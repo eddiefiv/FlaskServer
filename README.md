@@ -14,3 +14,8 @@ Simple localhsot Flask server that can interact with a local Psql Database using
 - Dont allow duplicate emails\usernames
 - Integrate some kind of web app to interact with the api so I can visualize changes
 - More
+
+## PostgreSQL Table Schema
+|       **id**       | **email** | **username** | **pw_hash** | **permissions** | **verified** |
+|:------------------:|:---------:|:------------:|:-----------:|:---------------:|:------------:|
+| SERIAL PRIMARY KEY |  VARCHAR  |    VARCHAR   |   VARCHAR   |    VARCHAR[]    |    BOOLEAN   |

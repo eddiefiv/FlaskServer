@@ -70,7 +70,7 @@ def data():
         except UserRetrievalException as e:
             return make_response("An error occured during user retrieval", 400)
 
-        res: Response = make_response(jsonify({"data": {"user": str(user)}}), 200)
+        res: Response = make_response(jsonify({"data": {"user": user.dict()}}), 200)
         return res
 
 @app.route("/verify", methods = ["POST"])
@@ -138,7 +138,7 @@ def error(e):
 if __name__ == "__main__":
     dotenv.load_dotenv()
 
-    psql = PsqlDB(dbname = "MyDB", user = "postgres", password = os.environ['DB_USER_PASSWORD'])
+    psql = PsqlDB(dbname = os.environ["PSQL_DB_NAME"], user = os.environ["PSQL_USER"], password = os.environ['PSQL_USER_PASSWORD'])
     psql.connect()
 
     psql_helper = PsqlDBHelper(psql)

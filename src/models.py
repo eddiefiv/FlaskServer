@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 @dataclass
 class User(object):
@@ -21,3 +21,6 @@ class User(object):
     username: str
     permissions: list[str]
     verified: bool
+
+    def dict(self) -> dict[str, str]:
+        return {k: str(v) for k, v in asdict(self).items()}

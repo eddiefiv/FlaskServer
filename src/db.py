@@ -8,19 +8,6 @@ from typing import Optional
 from collections.abc import Iterable
 from functools import wraps
 
-type PsqlDBAlias = PsqlDB # forward reference to PsqlDB for use in committable
-
-def committable(db: PsqlDBAlias):
-    """Handles the committing for a function that can cause a committable change to the db"""
-    def wrapper(func):
-        @wraps(func)
-        def decorator(*args, **kwargs):
-            func()
-            if not db.autocommit:
-                db.commit()
-        return decorator
-    return wrapper
-
 class PsqlDB(object):
     # basic attributes
     dbname: str = None
@@ -70,7 +57,7 @@ class PsqlDB(object):
             print(f"An error occurred during connection to psql database: {str(e)}")
             return False
 
-    def execute(self, query: str, args: Optional[tuple[any]] = None, format: bool = False) -> dict[str, any] | Cursor:
+    def execute(self, query: str, args: Optional[tuple[any]] = None, format: bool = False) -> dict[str, any] | Cursor | None:
         """Executes an action on the database
 
         Params
@@ -86,6 +73,9 @@ class PsqlDB(object):
         ----------
         pycopg.Cursor
             Reference to the current Cursor
+        dict[str, any]
+            Dictionary of data queried from the db
+        None
 
         Examples
         ----------
@@ -116,7 +106,7 @@ class PsqlDB(object):
         """Commits any uncommitted changes"""
         self.__conn.commit()
 
-    def __to_named_dict(self, fetched_data: tuple[any]) -> dict[str, any]:
+    def __to_named_dict(self, fetched_data: tuple[any]) -> dict[str, any] | None:
         """Takes data from a fetch and converts it to a dictionary containing column names
 
         Params
@@ -127,8 +117,11 @@ class PsqlDB(object):
         Returns
         ----------
         dict[str, any]
-            The resulting named dictionary containing column names matched to their respective orignal fetched values"""
-        return {colname.name: data for colname, data in zip(self.__cur.description, fetched_data)}
+            The resulting named dictionary containing column names matched to their respective orignal fetched values
+        None"""
+        if fetched_data is not None:
+            return {colname.name: data for colname, data in zip(self.__cur.description, fetched_data)}
+        return None
 
 class PsqlDBHelper(object):
     db: PsqlDB = None
@@ -137,7 +130,6 @@ class PsqlDBHelper(object):
         """Extends and abstracts the functionality of the PsqlDB class to enable more user friendly access to common db actions such as user retrieval and creation"""
         self.db = db
 
-    @committable(db)
     def create_user(self, email: str, username: str, password_hash: bytes) -> User:
         """Creates a new user in the db. Almost always ran either when a user creates a new account or during debugging
 
@@ -160,14 +152,13 @@ class PsqlDBHelper(object):
         UserCreationException
             Raised if there was a problem during user creation
         """
-        _r = self.db.execute("INSERT INTO users (email, username, pw_hash) VALUES (%s, %s, %s) RETURNING *", (email, username, password_hash.decode()), True)
+        _r = self._run_execute("INSERT INTO users (email, username, pw_hash) VALUES (%s, %s, %s) RETURNING *", (email, username, password_hash.decode()), True)
         if any(_r):
             _r.pop('pw_hash') # remove the hash from the data and return is separately
             u = User(**_r)
             return u
         raise UserCreationException("Database execution failed to insert new user. Check all parameters and connection to database and try again")
 
-    @committable(db)
     def retrieve_user_by_email(self, email: str) -> tuple[User, bytes]:
         """Attempt to retrieve a user from the db given their email.
 
@@ -185,14 +176,13 @@ class PsqlDBHelper(object):
         ----------
         UserRetrievalException
             Raised if there was a problem during user retrieval"""
-        _r = self.db.execute("SELECT * FROM users WHERE email=%s", (email,), True)
+        _r = self._run_execute("SELECT * FROM users WHERE email=%s", (email,), True)
         if any(_r):
             hashed_pw: str = _r.pop('pw_hash') # remove the hash from the data and return is separately
             u = User(**_r)
             return (u, hashed_pw.encode('utf-8'))
         raise UserRetrievalException("Databse execution returned no iterable. Check email param and connection to database and try again.")
 
-    @committable(db)
     def retrieve_user_by_id(self, id: int) -> tuple[User, bytes]:
         """Attempt to retrieve a user from the db given their email.
 
@@ -210,14 +200,13 @@ class PsqlDBHelper(object):
         ----------
         UserRetrievalException
             Raised if there was a problem during user retrieval"""
-        _r = self.db.execute("SELECT * FROM users WHERE id=%s", (id,), True)
+        _r = self._run_execute("SELECT * FROM users WHERE id=%s", (id,), True)
         if any(_r):
             hashed_pw: str = _r.pop('pw_hash') # remove the hash from the data and return is separately
             u = User(**_r)
             return (u, hashed_pw.encode('utf-8'))
         raise UserRetrievalException("Databse execution returned no iterable. Check email param and connection to database and try again.")
 
-    @committable(db)
     def verify_user(self, user: User) -> None:
         """Verifies a user that hasn't been verified yet
 
@@ -225,14 +214,13 @@ class PsqlDBHelper(object):
         ----------
         user (User)
             The user reference of whom to verify"""
-        _r = self.db.execute("UPDATE users SET verified = %s WHERE id=%s RETURNING *", (True, user.id), True)
+        _r = self._run_execute("UPDATE users SET verified = %s WHERE id=%s RETURNING *", (True, user.id), True)
         if any(_r):
             hashed_pw: str = _r.pop('pw_hash') # remove the hash from the data and return is separately
             u = User(**_r)
             return u
         raise UserVerificationException("Databse execution returned no iterable. Check that the user is valid and try again")
 
-    @committable(db)
     def add_user_permissions(self, user: User, permissions: Iterable[str]) -> None:
         """Appends permissions to the corresponding user in the db
 
@@ -243,6 +231,16 @@ class PsqlDBHelper(object):
         permissions (Iterable[str])
             An iterable of strings that are to be appended"""
         for permission in permissions:
-            _r = self.db.execute("UPDATE users SET permissions = array_append(permissions, %s) WHERE id=%s", (permission, user.id), True)
+            _r = self._run_execute("UPDATE users SET permissions = array_append(permissions, %s) WHERE id=%s", (permission, user.id), True)
             if not any(_r):
                 raise UserPermissionAppendException(f"Database execution returned no iterable during the appending of supplied permissions: {permissions}")
+
+    def _run_execute(self, query: str, args: tuple[any] | None, format: bool = False) -> dict[str, any] | Cursor | None:
+        assert query != ""
+
+        _r = self.db.execute(query, args, format)
+
+        if not self.db.autocommit:
+            self.db.commt()
+
+        return _r
