@@ -22,5 +22,5 @@ class User(object):
     permissions: list[str]
     verified: bool
 
-    def dict(self) -> dict[str, str]:
-        return {k: str(v) for k, v in asdict(self).items()}
+    def dict(self) -> dict[str, any]:
+        return {k: v for k, v in asdict(self).items()}

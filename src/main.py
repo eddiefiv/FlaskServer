@@ -123,7 +123,7 @@ def login():
         )
 
         return make_response(jsonify({"data": {"access_token": token}}), 200)
-    return make_response(f"Could not log in user {params['username']}", 400)
+    return make_response(f"Could not log in user {params['email']}", 400)
 
 @app.route("/logout", methods = ["POST"])
 @has_permissions(request, ['auth.base'])
