@@ -2,7 +2,7 @@
 Simple localhsot Flask server that can interact with a local PostgreSQL Database using psycopg3 as the driver. This project is moreso just for fun and learning, not for anything major
 
 ## Features
-- Psql database to store user information. [View users table schema](#postgresql-table-schema)
+- Psql database to store information structures. [View table schemas](#postgresql-table-schema)
 - User creation endpoint to interact with database's users table
 - User verification
 - Bcrypt to hash passwords on db
