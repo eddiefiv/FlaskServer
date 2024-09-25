@@ -7,7 +7,6 @@ from models import *
 from errors import *
 
 from functools import wraps
-from jsonschema import validate
 from collections.abc import Iterable
 
 from db import PsqlDB, PsqlDBHelper
@@ -165,6 +164,21 @@ def place_order(token):
         print(str(e))
         return make_response("An error occurred during order placement", 500)
     return make_response(jsonify({"data": {"msg": "Order placed successfully", "order": order.dict()}}))
+
+@app.route("/get-orders", methods = ["GET"])
+@has_permissions(request, ["auth.base"])
+def get_orders(token):
+    try:
+        user, _ = psql_helper.retrieve_user_by_id(token['user_id'])
+    except UserRetrievalException:
+        return make_response(f"Could not retrieve user with id {token['user_id']}")
+
+    try:
+        orders: list[Order] = psql_helper.get_orders(user)
+    except OrderRetrievalException as e:
+        return make_response(f"An error occurred during order retrieval: {str(e)}", 500)
+
+    return make_response(jsonify({"data": {"msg": "Order retrieval", "orders": [order.dict() for order in orders]}}))
 #
 # ERROR ROUTES
 #

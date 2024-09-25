@@ -267,6 +267,7 @@ class PsqlDBHelper(object):
             raise OrderPlaceException("An error occured during order placement, check parameters and try again")
         try:
             order = Order(**_r)
+            order.items = items
         except Exception as e:
             raise OrderPlaceException(f"Invalid order format: {_r}. Exception: {str(e)}")
 
