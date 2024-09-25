@@ -14,11 +14,11 @@ Simple localhsot Flask server that can interact with a local PostgreSQL Database
     - Order placement
     - Order retrieval
     - Item retrieval
-    - (Soon to be item creation endpoint)
+    - Item creation
 
 ## What I want do to
-- Dont allow duplicate emails\usernames
-- Integrate some kind of web app to interact with the api so I can visualize changes
+- Integrate some kind of web app to interact with the api so I can visualize said interactions
+- Cart/checkout system
 - More
 
 ## PostgreSQL Table Schema
