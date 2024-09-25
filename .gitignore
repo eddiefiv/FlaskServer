@@ -1,5 +1,6 @@
 .env
 
+.vscode/
 node_modules
 tests/
 __pycache__/
