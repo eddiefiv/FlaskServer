@@ -7,7 +7,7 @@ from models import *
 from errors import *
 
 from functools import wraps
-from collections.abc import Iterable, 
+from collections.abc import Iterable
 
 from db import PsqlDB, PsqlDBHelper
 
