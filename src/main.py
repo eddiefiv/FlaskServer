@@ -7,6 +7,8 @@ from models import *
 from errors import *
 
 from functools import wraps
+from jsonschema import validate
+from collections.abc import Iterable
 
 from db import PsqlDB, PsqlDBHelper
 
@@ -48,10 +50,13 @@ def has_permissions(req: Request, permissions: list[str]):
                         return make_response(f"Insufficient permissions to perform this action. Missing permission: {permission}", 401)
             else: # invalid token
                 return make_response("Invalid access token.", 401)
-            return func(*args, **kwargs) # if all required permissions exist in token permissions, allow the action (run the decorated function)
+            return func(token = decoded, *args, **kwargs) # if all required permissions exist in token permissions, allow the action (run the decorated function)
         return decorator
     return wrapper
 
+#
+# BASE/TESTING ROUTES
+#
 @app.route("/")
 def default():
     res: Response = make_response(jsonify({"data": {"h1": "test"}}), 200)
@@ -59,27 +64,24 @@ def default():
 
 @app.route("/user-data", methods = ["GET"])
 @has_permissions(request, ['auth.base'])
-def data():
-    args = request.args
+def data(token):
+    try:
+        user, _ = psql_helper.retrieve_user_by_id(token['user_id'])
+    except UserRetrievalException as e:
+        return make_response("An error occured during user retrieval", 400)
 
-    if 'token' in args:
-        decoded: dict[str, str] = decode_jwt(args['token'])
+    res: Response = make_response(jsonify({"data": {"user": user.dict()}}), 200)
+    return res
 
-        try:
-            user, _ = psql_helper.retrieve_user_by_id(decoded['user_id'])
-        except UserRetrievalException as e:
-            return make_response("An error occured during user retrieval", 400)
-
-        res: Response = make_response(jsonify({"data": {"user": user.dict()}}), 200)
-        return res
-
+#
+# CORE ROUTES
+# logging in, logging out, user verification, user creation, etc.
+#
 @app.route("/verify", methods = ["POST"])
 @has_permissions(request, ['auth.base'])
-def verify():
-    params = request.json
-
+def verify(token):
     try:
-        user, _ = psql_helper.retrieve_user_by_id(decode_jwt(params['token'])['user_id'])
+        user, _ = psql_helper.retrieve_user_by_id(decode_jwt(token)['user_id'])
     except UserRetrievalException as e:
         return make_response("An error occured during user retrieval", 400)
 
@@ -93,7 +95,7 @@ def verify():
 
 @app.route("/create", methods = ["POST"])
 def create_user():
-    params: dict[str, str] = request.json
+    params = request.json
 
     hashed_pw = bcrypt.hashpw(params['pw'].encode('utf-8'), bcrypt.gensalt())
 
@@ -107,7 +109,7 @@ def create_user():
 
 @app.route("/login", methods = ["POST"])
 def login():
-    params: dict[str, str] = request.json
+    params = request.json
 
     # check pw hash
     try:
@@ -123,13 +125,49 @@ def login():
         )
 
         return make_response(jsonify({"data": {"access_token": token}}), 200)
-    return make_response(f"Could not log in user {params['username']}", 400)
+    return make_response(f"Could not log in user {params['email']}", 400)
 
 @app.route("/logout", methods = ["POST"])
 @has_permissions(request, ['auth.base'])
-def logout():
+def logout(token):
     return make_response("Logged out successfully", 200)
 
+#
+# ORDER FLOW ROUTES
+#
+@app.route("/place-order", methods = ["POST"])
+@has_permissions(request, ['auth.base'])
+def place_order(token):
+    params = request.json
+
+    if ('items' not in params) or (params['items'] == []) or (not isinstance(params['items'], Iterable)):
+        return make_response("Parameter 'items' is either not present or in invalid format")
+
+    items: list[Item] = []
+
+    for item in params['items']:
+        if 'item_name' not in item:
+            return make_response(f"Invalid item format: {item}", 400)
+        item_from_db = psql_helper.get_item_by_name(item['item_name'])
+
+        if item_from_db is None:
+            return make_response(f"Item of name {item['item_name']} does not exist", 400)
+        items.append(item_from_db)
+
+    try:
+        user, _ = psql_helper.retrieve_user_by_id(token['user_id'])
+    except UserRetrievalException:
+        return make_response(f"Could not retrieve user with id {token['id']}", 400)
+
+    try:
+        order: Order = psql_helper.place_order(user, items)
+    except OrderPlaceException as e:
+        print(str(e))
+        return make_response("An error occurred during order placement", 500)
+    return make_response(jsonify({"data": {"msg": "Order placed successfully", "order": order.dict()}}))
+#
+# ERROR ROUTES
+#
 @app.errorhandler(404)
 def error(e):
     res: Response = make_response("404", 404)

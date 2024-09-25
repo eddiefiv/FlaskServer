@@ -8,6 +8,8 @@ from typing import Optional
 from collections.abc import Iterable
 from functools import wraps
 
+from datetime import datetime, timedelta
+
 class PsqlDB(object):
     # basic attributes
     dbname: str = None
@@ -235,12 +237,72 @@ class PsqlDBHelper(object):
             if not any(_r):
                 raise UserPermissionAppendException(f"Database execution returned no iterable during the appending of supplied permissions: {permissions}")
 
-    def _run_execute(self, query: str, args: tuple[any] | None, format: bool = False) -> dict[str, any] | Cursor | None:
+    def get_item_by_name(self, item_name: str) -> Item | None:
+        """Retrieves an item by the item's name
+
+        Params
+        ----------
+        item_name (str)
+            The name of the item to retrieve"""
+        _r = self._run_execute("SELECT * FROM items WHERE item_name=%s", (item_name,), True)
+        if (_r is None) or (not any(_r)): # presumably no item found
+            return None
+        try:
+            item = Item(**_r)
+        except:
+            raise ItemRetrievalException(f"Invalid item format: {_r}")
+        return item
+
+    def place_order(self, user: User, items: list[Item]) -> Order:
+        """Places an order and reflects the changes to the database
+
+        Params
+        ----------
+        user (User)
+            The user who placed the order
+        items (list[Item])
+            A list of the items to be associated with this order"""
+        _r = self._run_execute("INSERT INTO orders (ordered_on, shipping_on, user_id, items) VALUES (NOW(), %s, %s, %s) RETURNING *", (datetime.now() + timedelta(days = 3), user.id, [item.item_id for item in items]), True, True)
+        if not any(_r):
+            raise OrderPlaceException("An error occured during order placement, check parameters and try again")
+        try:
+            order = Order(**_r)
+        except Exception as e:
+            raise OrderPlaceException(f"Invalid order format: {_r}. Exception: {str(e)}")
+
+        _r = self._run_execute("UPDATE users SET orders = array_append(orders, %s) WHERE id=%s RETURNING *", (order.order_id, user.id), True, True)
+        if not any(_r):
+            raise OrderPlaceException("An error occurred while updating the user's order, disregarding order placement")
+
+        self.db.commit() # commit changes, as the two previous executions were staged but not automatically comitted
+        return order
+
+    def get_orders(self, user: User) -> list[Order] | None:
+        """Retrieves all the current orders that the given user has open
+
+        Params
+        ----------
+        user (User)
+            The user of whoms orders should be retrieved"""
+        orders: list[Order] = []
+        user_order_ids = self._run_execute("SELECT orders FROM users WHERE id=%s", (user.id,), True)
+        if user_order_ids is not None or user_order_ids == []:
+            for order_id in user_order_ids:
+                user_order = self._run_execute("SELECT * FROM orders WHERE order_id=%s", (order_id,), True)
+                if user_order is not None:
+                    orders.append(Order(**user_order))
+                    continue
+                raise OrderRetrievalException(f"Could not retrieve order with id {order_id}")
+            return orders
+        return None
+
+    def _run_execute(self, query: str, args: tuple[any] | None, format: bool = False, commit_override: bool = False) -> dict[str, any] | Cursor | None:
         assert query != ""
 
         _r = self.db.execute(query, args, format)
 
-        if not self.db.autocommit:
-            self.db.commt()
+        if not commit_override: # NOTE: if commit_override is True, changes will not be automatically committed, and the changes MUST be rolled back to ensure those changes wont be committed on a future commit
+            if not self.db.autocommit:
+                self.db.commt()
 
         return _r
