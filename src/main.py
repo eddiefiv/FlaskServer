@@ -41,14 +41,17 @@ def has_permissions(req: Request, permissions: list[str]):
             except Exception as e:
                 return make_response("Error during request parameter parsing", 400)
 
-            decoded: dict[str, str] = decode_jwt(token)
+            try:
+                decoded: dict[str, str] = decode_jwt(token)
+            except jwt.exceptions.InvalidSignatureError:
+                return make_response("Invalid access token", 401)
 
             if decoded:
                 for permission in permissions: # check all required permissions and see if they exist in the decoded token permissions
                     if permission not in decoded['perms']: # if not present in token permissions, disallow the action
                         return make_response(f"Insufficient permissions to perform this action. Missing permission: {permission}", 401)
             else: # invalid token
-                return make_response("Invalid access token.", 401)
+                return make_response("Invalid access token", 401)
             return func(token = decoded, *args, **kwargs) # if all required permissions exist in token permissions, allow the action (run the decorated function)
         return decorator
     return wrapper
@@ -179,6 +182,23 @@ def get_orders(token):
         return make_response(f"An error occurred during order retrieval: {str(e)}", 500)
 
     return make_response(jsonify({"data": {"msg": "Order retrieval", "orders": [order.dict() for order in orders]}}))
+
+@app.route("/create-item", methods = ["POST"])
+@has_permissions(request, ["auth.base"])
+def create_item(token):
+    params = request.json
+
+    item_parameters = ['item_name', 'item_categories', 'item_market_price']
+
+    if ('item' not in params) or ('item_name' not in params['item']) or ('item_categories' not in params['item']) or ('item_market_price' not in params['item']):
+        return make_response(f"Invalid request parameters. Missing parameters: {[missing for missing in item_parameters if missing not in params['item']]}", 400)
+    if params['item']['item_categories'] == []:
+        return make_response("Item categories cannot be empty", 400)
+    try:
+        item = psql_helper.create_item(params['item']['item_name'], params['item']['item_categories'], params['item']['item_market_price'])
+    except ItemCreationException as e:
+        return make_response(f"An error occurred during item creation. {str(e)}", 500)
+    return make_response(jsonify({"data": {"msg": "Item successfully created", "item": item.dict()}}))
 #
 # ERROR ROUTES
 #

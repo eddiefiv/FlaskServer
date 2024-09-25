@@ -25,3 +25,7 @@ class OrderRetrievalException(Exception):
 class ItemRetrievalException(Exception):
     """Raised when an error occurs during item retrieval"""
     ...
+
+class ItemCreationException(Exception):
+    """Raised when an error occurs during item creation"""
+    ...

@@ -237,6 +237,24 @@ class PsqlDBHelper(object):
             if not any(_r):
                 raise UserPermissionAppendException(f"Database execution returned no iterable during the appending of supplied permissions: {permissions}")
 
+    def create_item(self, item_name: str, item_categories: list[str], item_market_price: float) -> Item:
+        """Creates an item and saves it on the db
+
+        Params
+        ----------
+        item_name (str)
+            The name of the item
+        item_categories (list[str])
+            The item's categories"""
+        # make sure an item with that name doesnt exist
+        _item = self._run_execute("SELECT * FROM items WHERE item_name=%s", (item_name,), True)
+
+        if _item is None: # item doesnt exist
+            _r = self._run_execute("INSERT INTO items (item_name, item_categories, item_market_price) VALUES (%s, %s, %s) RETURNING *", (item_name, item_categories, item_market_price), True)
+            _item = Item(**_r)
+            return _item
+        raise ItemCreationException(f"An item with name {item_name} already exists")
+
     def get_item_by_name(self, item_name: str) -> Item | None:
         """Retrieves an item by the item's name
 
