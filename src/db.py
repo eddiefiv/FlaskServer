@@ -237,15 +237,20 @@ class PsqlDBHelper(object):
             if not any(_r):
                 raise UserPermissionAppendException(f"Database execution returned no iterable during the appending of supplied permissions: {permissions}")
 
-    def create_item(self, item_name: str, item_categories: list[str], item_market_price: float) -> Item:
+    def create_item(self, item_name: str, item_categories: Iterable[str], item_market_price: float) -> Item:
         """Creates an item and saves it on the db
 
         Params
         ----------
         item_name (str)
             The name of the item
-        item_categories (list[str])
-            The item's categories"""
+        item_categories (Iterable[str])
+            The item's categories
+
+        Returns
+        ----------
+        Item
+            Structure for the newly created item"""
         # make sure an item with that name doesnt exist
         _item = self._run_execute("SELECT * FROM items WHERE item_name=%s", (item_name,), True)
 
@@ -261,7 +266,14 @@ class PsqlDBHelper(object):
         Params
         ----------
         item_name (str)
-            The name of the item to retrieve"""
+            The name of the item to retrieve
+
+        Returns
+        ----------
+        Item
+            Structure for the retrieved item
+        None
+            If no item found"""
         _r = self._run_execute("SELECT * FROM items WHERE item_name=%s", (item_name,), True)
         if (_r is None) or (not any(_r)): # presumably no item found
             return None
@@ -271,15 +283,20 @@ class PsqlDBHelper(object):
             raise ItemRetrievalException(f"Invalid item format: {_r}")
         return item
 
-    def place_order(self, user: User, items: list[Item]) -> Order:
+    def place_order(self, user: User, items: Iterable[Item]) -> Order:
         """Places an order and reflects the changes to the database
 
         Params
         ----------
         user (User)
             The user who placed the order
-        items (list[Item])
-            A list of the items to be associated with this order"""
+        items (Iterable[Item])
+            A Iterable of the items to be associated with this order
+
+        Returns
+        ----------
+        Order
+            Structure for the order that was placed"""
         _r = self._run_execute("INSERT INTO orders (ordered_on, shipping_on, user_id, items) VALUES (NOW(), %s, %s, %s) RETURNING *", (datetime.now() + timedelta(days = 3), user.id, [item.item_id for item in items]), True, True)
         if not any(_r):
             raise OrderPlaceException("An error occured during order placement, check parameters and try again")
@@ -296,14 +313,21 @@ class PsqlDBHelper(object):
         self.db.commit() # commit changes, as the two previous executions were staged but not automatically comitted
         return order
 
-    def get_orders(self, user: User) -> list[Order] | None:
+    def get_orders(self, user: User) -> Iterable[Order] | None:
         """Retrieves all the current orders that the given user has open
 
         Params
         ----------
         user (User)
-            The user of whoms orders should be retrieved"""
-        orders: list[Order] = []
+            The user of whoms orders should be retrieved
+
+        Returns
+        ----------
+        Iterable[Order]
+            An iterable of Order structures that were retrieved
+        None
+            If no orders found"""
+        orders: Iterable[Order] = []
         user_order_ids = self._run_execute("SELECT orders FROM users WHERE id=%s", (user.id,), True)
         if user_order_ids is not None or user_order_ids == []:
             for order_id in user_order_ids:

@@ -7,7 +7,7 @@ from models import *
 from errors import *
 
 from functools import wraps
-from collections.abc import Iterable
+from collections.abc import Iterable, 
 
 from db import PsqlDB, PsqlDBHelper
 
@@ -27,7 +27,7 @@ def decode_jwt(token: str) -> dict[str, str]:
 
     return decoded
 
-def has_permissions(req: Request, permissions: list[str]):
+def has_permissions(req: Request, permissions: Iterable[str]):
     def wrapper(func):
         @wraps(func)
         def decorator(*args, **kwargs):
@@ -145,7 +145,7 @@ def place_order(token):
     if ('items' not in params) or (params['items'] == []) or (not isinstance(params['items'], Iterable)):
         return make_response("Parameter 'items' is either not present or in invalid format")
 
-    items: list[Item] = []
+    items: Iterable[Item] = []
 
     for item in params['items']:
         if 'item_name' not in item:
@@ -177,7 +177,7 @@ def get_orders(token):
         return make_response(f"Could not retrieve user with id {token['user_id']}")
 
     try:
-        orders: list[Order] = psql_helper.get_orders(user)
+        orders: Iterable[Order] = psql_helper.get_orders(user)
     except OrderRetrievalException as e:
         return make_response(f"An error occurred during order retrieval: {str(e)}", 500)
 

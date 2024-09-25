@@ -1,6 +1,7 @@
 import datetime
 
 from dataclasses import dataclass, asdict
+from collections.abc import Iterable
 
 type OrderAlias = Order
 
@@ -29,9 +30,9 @@ class User(Model):
     id: int
     email: str
     username: str
-    permissions: list[str]
+    permissions: Iterable[str]
     verified: bool
-    orders: list[OrderAlias]
+    orders: Iterable[OrderAlias]
 
 @dataclass
 class Item(Model):
@@ -48,7 +49,7 @@ class Item(Model):
     item_market_price (float)
         The price of the item"""
     item_id: int
-    item_categories: list[str]
+    item_categories: Iterable[str]
     item_name: str
     item_market_price: float
 
@@ -72,4 +73,4 @@ class Order(Model):
     ordered_on: datetime.datetime
     shipping_on: datetime.datetime
     user_id: int
-    items: list[Item]
+    items: Iterable[Item]
