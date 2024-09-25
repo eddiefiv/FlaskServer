@@ -10,6 +10,11 @@ Simple localhsot Flask server that can interact with a local PostgreSQL Database
 - JWT access token passed to logged in user for authentication
     - Token contains permissions that which the user is allowed, assigned from user's permisssions column in db
     - Authorized endpoints check certain permissions using a custom wrapper middleware to ensure the user's current access token contains valid permissions, otherwise the endpoint returns 401 (Unauthorized)
+- New endpoints and database functionality:
+    - Order placement
+    - Order retrieval
+    - Item retrieval
+    - (Soon to be item creation endpoint)
 
 ## What I want do to
 - Dont allow duplicate emails\usernames
@@ -17,6 +22,17 @@ Simple localhsot Flask server that can interact with a local PostgreSQL Database
 - More
 
 ## PostgreSQL Table Schema
+### users
 |       **id**       | **email** | **username** | **pw_hash** | **permissions** | **verified** |
 |:------------------:|:---------:|:------------:|:-----------:|:---------------:|:------------:|
 | SERIAL PRIMARY KEY |  VARCHAR  |    VARCHAR   |   VARCHAR   |    VARCHAR[]    |    BOOLEAN   |
+
+### orders
+|    **order_id**    | **ordered_on** | **shipping_on** | **user_id** | **items** |
+|:------------------:|:--------------:|:---------------:|:-----------:|:---------:|
+| SERIAL PRIMARY KEY |    TIMESTAMP   |    TIMESTAMP    |   INTEGER   | INTEGER[] |
+
+# items
+|    **item_id**     | **item_categories** | **item_name** | **item_market_price**|
+|:------------------:|:-------------------:|:-------------:|:--------------------:|
+| SERIAL PRIMARY KEY |      VARCHAR[]      |    VARCHAR    |         REAL         |
